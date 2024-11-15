@@ -1,6 +1,6 @@
-# Ignore datasets and checkpoints in SUNet
+# Ignore datasets and checkpoints in GLOWNet
 
-SUNet/datasets/Ablation_dataset/
-SUNet/datasets/DIV2K/
-SUNet/datasets/Denoising_DIV2K/
-SUNet/checkpoints/
+GLOWNet/datasets/Ablation_dataset/
+GLOWNet/datasets/DIV2K/
+GLOWNet/datasets/Denoising_DIV2K/
+GLOWNet/checkpoints/
