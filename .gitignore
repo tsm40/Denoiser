@@ -1,10 +1,6 @@
-# Ignore Ablation dataset
-/home/shared/Denoiser/SUNet/datasets/Ablation_dataset/*
+# Ignore datasets and checkpoints in SUNet
 
-# Ignore DIV2K dataset
-/home/shared/Denoiser/SUNet/datasets/DIV2K/*
-
-/home/shared/Denoiser/SUNet/datasets/Denoising_DIV2K/*
-
-# Ignore checkpoints
-/home/shared/Denoiser/SUNet/checkpoints/*
+SUNet/datasets/Ablation_dataset/
+SUNet/datasets/DIV2K/
+SUNet/datasets/Denoising_DIV2K/
+SUNet/checkpoints/
