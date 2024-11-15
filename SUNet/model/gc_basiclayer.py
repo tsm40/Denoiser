@@ -41,7 +41,7 @@ class ContextBlock(nn.Module):
         self.pooling_type = pooling_type
         self.fusion_types = fusion_types
         if pooling_type == 'att':
-            print('INPLANES:', inplanes)
+            #print('INPLANES:', inplanes)
             self.conv_mask = nn.Conv2d(inplanes, 1, kernel_size=1)
             self.softmax = nn.Softmax(dim=2)
         else:
@@ -75,13 +75,13 @@ class ContextBlock(nn.Module):
             last_zero_init(self.channel_mul_conv)
 
     def spatial_pool(self, x):
-        print('gc spatial pooling. xsize:', x.size())
+        #print('gc spatial pooling. xsize:', x.size())
         #x = x.permute(2,0,1)
         batch, channel, height, width = x.size()
         L = height * width
         #batch, channel, L = x.size()
         if self.pooling_type == 'att':
-            print('self.pooling_type==att. inside if statement')
+            #print('self.pooling_type==att. inside if statement')
             input_x = x
             # [N, C, H * W]
             input_x = input_x.view(batch, channel, L)
@@ -106,7 +106,7 @@ class ContextBlock(nn.Module):
         return context
 
     def forward(self, x):
-        print('gc forward.')
+        #print('gc forward.')
         # [N, C, 1, 1]
         context = self.spatial_pool(x)
 
@@ -139,7 +139,7 @@ class DownsamplingBlock(nn.Module):
     
 class GlobalContextBasicLayer(nn.Module):
     def __init__(self, dim, depth, downsample=None, norm_layer=nn.BatchNorm2d, use_checkpoint=False):
-        print('we making a gc basic layer')
+        #print('we making a gc basic layer')
         super(GlobalContextBasicLayer, self).__init__()
         self.dim = dim
         depth = 2      # TEMP HARDCODING DEPTH
@@ -158,7 +158,7 @@ class GlobalContextBasicLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x):
-        print('we going forward in a gc basic layer')
+        #print('we going forward in a gc basic layer')
         for blk in self.blocks:
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x)
@@ -185,7 +185,7 @@ class GlobalContextBasicLayer_up(nn.Module):
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False) if upsample else None
 
     def forward(self, x):
-        print('we are upsampling gc basic layer')
+        #print('we are upsampling gc basic layer')
         for blk in self.blocks:
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x)

@@ -3,6 +3,80 @@ import torch.nn as nn
 from timm.models.layers import to_2tuple, trunc_normal_
 from .bottleneck import Bottleneck
 from .swin_basiclayer import *
+from .gc_basiclayer import * 
+
+class CrossAttentionLayer(nn.Module):
+    def __init__(self, local_dim, global_dim, num_heads=8):
+        super(CrossAttentionLayer, self).__init__()
+        self.num_heads = num_heads
+        self.local_dim = local_dim
+        self.global_dim = global_dim
+
+        # Ensure that local_dim and global_dim are divisible by num_heads
+        assert local_dim % num_heads == 0, "local_dim must be divisible by num_heads"
+        assert global_dim % num_heads == 0, "global_dim must be divisible by num_heads"
+
+        self.dim_head_local = local_dim // num_heads
+        self.dim_head_global = global_dim // num_heads
+
+        # Linear projections for local features (queries)
+        self.query_proj = nn.Linear(local_dim, local_dim)
+
+        # Linear projections for global features (keys and values)
+        self.key_proj = nn.Linear(global_dim, local_dim)
+        self.value_proj = nn.Linear(global_dim, local_dim)
+
+        # Output projection
+        self.out_proj = nn.Linear(local_dim, local_dim)
+
+        # Optional: Layer normalization
+        self.norm_local = nn.LayerNorm(local_dim)
+        self.norm_global = nn.LayerNorm(global_dim)
+
+    def forward(self, x_local, x_global):
+        """
+        x_local: Tensor of shape (B, L, C_local), where L = H_local * W_local
+        x_global: Tensor of shape (B, C_global, H_global, W_global)
+        """
+        B, L, C_local = x_local.shape
+        B_global, C_global, H_global, W_global = x_global.shape
+
+        # Reshape x_global to (B, L_global, C_global)
+        x_global = x_global.view(B_global, C_global, -1).transpose(1, 2)  # Shape: (B, L_global, C_global)
+        L_global = H_global * W_global
+
+        # Optional: Normalize inputs
+        x_local_norm = self.norm_local(x_local)
+        x_global_norm = self.norm_global(x_global)
+
+        # Project local features (queries)
+        Q = self.query_proj(x_local_norm)  # Shape: (B, L, C_local)
+
+        # Project global features (keys and values)
+        K = self.key_proj(x_global_norm)   # Shape: (B, L_global, C_local)
+        V = self.value_proj(x_global_norm) # Shape: (B, L_global, C_local)
+
+        # Reshape for multi-head attention
+        Q = Q.view(B, L, self.num_heads, self.dim_head_local).transpose(1, 2)  # Shape: (B, num_heads, L, dim_head_local)
+        K = K.view(B, L_global, self.num_heads, self.dim_head_local).transpose(1, 2)  # Shape: (B, num_heads, L_global, dim_head_local)
+        V = V.view(B, L_global, self.num_heads, self.dim_head_local).transpose(1, 2)  # Shape: (B, num_heads, L_global, dim_head_local)
+
+        # Scaled dot-product attention
+        attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.dim_head_local ** 0.5)  # Shape: (B, num_heads, L, L_global)
+        attn_weights = torch.softmax(attn_scores, dim=-1)  # Shape: (B, num_heads, L, L_global)
+
+        attn_output = torch.matmul(attn_weights, V)  # Shape: (B, num_heads, L, dim_head_local)
+
+        # Concatenate heads
+        attn_output = attn_output.transpose(1, 2).contiguous().view(B, L, C_local)  # Shape: (B, L, C_local)
+
+        # Output projection
+        attn_output = self.out_proj(attn_output)  # Shape: (B, L, C_local)
+
+        # Residual connection
+        x_merged = x_local + attn_output  # Shape: (B, L, C_local)
+
+        return x_merged
 
 class PatchEmbed(nn.Module):
     r""" Image to Patch Embedding
@@ -118,6 +192,7 @@ class SUNet(nn.Module):
 
         # build encoder and bottleneck layers
         self.layers = nn.ModuleList()
+        self.gc_layers = nn.ModuleList()
         for i_layer in range(self.num_layers):
             layer = BasicLayer(dim=int(embed_dim * 2 ** i_layer),
                                input_resolution=(patches_resolution[0] // (2 ** i_layer),
@@ -134,14 +209,16 @@ class SUNet(nn.Module):
                                use_checkpoint=use_checkpoint)
             self.layers.append(layer)
 
-            '''
-            assume some sort of gc block is added for both down and up
-            for swin, we are suing patch merging to downsample, i'm not sure 
-            what's being used for global context, let me know when you're done binjie
-            
-            '''
+            gc_layer = GlobalContextBasicLayer(
+                dim=int(embed_dim * 2 ** i_layer),
+                depth=depths[i_layer] // 2, 
+                downsample=DownsamplingBlock if (i_layer < self.num_layers - 1) else None,
+                use_checkpoint=use_checkpoint
+            )
 
-        
+            self.gc_layers.append(gc_layer)
+
+        '''
         self.bottleneck = Bottleneck(
             channels=int(embed_dim * 2 ** (i_layer)), 
             block=BasicLayer(dim=int(embed_dim * 2 ** (i_layer)),
@@ -158,7 +235,7 @@ class SUNet(nn.Module):
                                downsample= None,
                                use_checkpoint=use_checkpoint)
         )
-        
+        '''
 
         # build decoder layers
         self.layers_up = nn.ModuleList()
