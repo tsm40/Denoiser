@@ -71,7 +71,6 @@ warmup_epochs = 3
 scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, OPT['EPOCHS'] - warmup_epochs,
                                                         eta_min=float(OPT['LR_MIN']))
 scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=warmup_epochs, after_scheduler=scheduler_cosine)
-scheduler.step()
 
 ## Resume (Continue training by a pretrained model)
 if Train['RESUME']:
@@ -94,9 +93,9 @@ L1_loss = nn.L1Loss()
 print('==> Loading datasets')
 train_dataset = get_training_data(train_dir, {'patch_size': Train['TRAIN_PS']})
 train_loader = DataLoader(dataset=train_dataset, batch_size=OPT['BATCH'],
-                          shuffle=True, num_workers=0, drop_last=False)
+                          shuffle=True, num_workers=2, drop_last=False)
 val_dataset = get_validation_data(val_dir, {'patch_size': Train['VAL_PS']})
-val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=0,
+val_loader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=2,
                         drop_last=False)
 
 # Show the training configuration

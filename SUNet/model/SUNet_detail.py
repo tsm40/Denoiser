@@ -370,6 +370,13 @@ class SUNet(nn.Module):
                                use_checkpoint=use_checkpoint)
             self.layers.append(layer)
 
+            '''
+            assume some sort of gc block is added for both down and up
+            for swin, we are suing patch merging to downsample, i'm not sure 
+            what's being used for global context, let me know when you're done binjie
+            
+            '''
+
         
         self.bottleneck = Bottleneck(
             channels=int(embed_dim * 2 ** (i_layer)), 
@@ -491,9 +498,30 @@ class SUNet(nn.Module):
 
     def forward(self, x):
         #print(f'initial {x.shape}')
-        x = self.conv_first(x)
+
+        x = self.conv_first(x) # obtain first feature map
+
         #print(f'after frist conv {x.shape}')
         x, residual, x_downsample = self.forward_features(x)
+
+        # add downsampling path for gc net 
+        # assume gc_x, gc_residual, gc_downsample = self.gc_forward_reatures(x)
+        # go through bottle neck 
+        # go through forward up features
+        # assume gc_up = self.gc_foward_up_features(gc_x, gc_downsample)
+        # x_up = self.forward_up_features(x, x_downsample)
+        # note that the forward functions should also be recorded like x_downsample so the
+        # merging can still happen at the upsampling stage 
+        # now, perform merging
+        # merge_x, merge_downsample = self.merge_down(x, x_downsample, gc_x, gc_downsample)
+        # merge_x = self.merge_up_features(merge_x, merge_downsample, gc_up, x_up) 
+        # the merging will then perform some sort of merging logic for which takes care 
+        # of the merging
+
+        # note that the merging can be any sort of merging
+        # eg. using gc as a conditional supplemental feature for patched sample 
+        # cross attention, or read into DiT blocks for conditional see if we can do 
+        # something similar s
 
         x = self.bottleneck(x)
         x = self.forward_up_features(x, x_downsample)
