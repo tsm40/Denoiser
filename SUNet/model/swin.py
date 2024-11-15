@@ -132,7 +132,6 @@ class WindowAttention(nn.Module):
         flops += N * self.dim * self.dim
         return flops
 
-
 class SwinTransformerBlock(nn.Module):
     r""" Swin Transformer Block.
 
