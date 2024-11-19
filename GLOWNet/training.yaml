@@ -38,6 +38,6 @@ TRAINING:
   RESUME: False
   TRAIN_PS: 256
   VAL_PS: 256
-  TRAIN_DIR: './datasets/Denoising_DIV2K/small_sample/train'       # path to training data
-  VAL_DIR: './datasets/Denoising_DIV2K/small_sample/test' # path to validation data
+  TRAIN_DIR: './datasets/Denoising_DIV2K/small/train'       # path to training data
+  VAL_DIR: './datasets/Denoising_DIV2K/small/test' # path to validation data
   SAVE_DIR: './checkpoints'           # path to save models and images

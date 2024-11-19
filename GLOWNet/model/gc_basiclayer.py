@@ -137,6 +137,74 @@ class DownsamplingBlock(nn.Module):
         x = self.activation(x)
         return x
     
+class GCUpSample(nn.Module):
+    def __init__(self, in_channels, scale_factor=2):
+        super(GCUpSample, self).__init__()
+        self.scale_factor = scale_factor
+
+        if self.scale_factor == 2:
+            # Output channels reduced by half
+            out_channels = in_channels // 2
+
+            # Pixel Shuffle upsampling path
+            self.up_p = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels * (scale_factor), kernel_size=1, stride=1, padding=0, bias=False),
+                nn.PReLU(),
+                nn.PixelShuffle(self.scale_factor),  # Upsamples H and W by scale_factor
+                nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+            )
+
+            # Bilinear upsampling path
+            self.up_b = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.PReLU(),
+                nn.Upsample(scale_factor=self.scale_factor, mode='bilinear', align_corners=False),
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+            )
+
+            # Final convolution to merge the paths
+            self.conv = nn.Conv2d(out_channels * 2, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+
+        elif self.scale_factor == 4:
+            # Output channels reduced by a factor of 4
+            out_channels = in_channels // 4
+
+            # Pixel Shuffle upsampling path
+            self.up_p = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels * (scale_factor), kernel_size=1, stride=1, padding=0, bias=False),
+                nn.PReLU(),
+                nn.PixelShuffle(self.scale_factor),
+                nn.Conv2d(out_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+            )
+
+            # Bilinear upsampling path
+            self.up_b = nn.Sequential(
+                nn.Conv2d(in_channels, in_channels, kernel_size=1, stride=1, padding=0, bias=False),
+                nn.PReLU(),
+                nn.Upsample(scale_factor=self.scale_factor, mode='bilinear', align_corners=False),
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+            )
+
+            # Final convolution to merge the paths
+            self.conv = nn.Conv2d(out_channels * 2, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
+
+        else:
+            raise ValueError("Unsupported scale factor. Only 2 and 4 are supported.")
+
+    def forward(self, x):
+        """
+        x: Tensor of shape (B, C_in, H_in, W_in)
+        """
+        # Apply Pixel Shuffle upsampling
+        x_p = self.up_p(x)
+        # Apply Bilinear upsampling
+        x_b = self.up_b(x)
+        # Concatenate along the channel dimension
+        out = torch.cat([x_p, x_b], dim=1)
+        # Merge the features
+        out = self.conv(out)
+        return out  # Output shape: (B, C_out, H_out, W_out)
+    
 class GlobalContextBasicLayer(nn.Module):
     def __init__(self, dim, depth, downsample=None, norm_layer=nn.BatchNorm2d, use_checkpoint=False):
         #print('we making a gc basic layer')
@@ -170,7 +238,7 @@ class GlobalContextBasicLayer(nn.Module):
         return x
 
 class GlobalContextBasicLayer_up(nn.Module):
-    def __init__(self, dim, input_resolution, depth, norm_layer=nn.LayerNorm, use_checkpoint=False, upsample=None):
+    def __init__(self, dim, input_resolution, depth, use_checkpoint=False, upsample=None):
         super(GlobalContextBasicLayer_up, self).__init__()
         self.dim = dim
         self.input_resolution = input_resolution
@@ -182,7 +250,10 @@ class GlobalContextBasicLayer_up(nn.Module):
             ContextBlock(inplanes=dim, ratio=1.0) for _ in range(depth)
         ])
 
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False) if upsample else None
+        if upsample is not None:
+            self.upsample = GCUpSample(in_channels=dim, scale_factor=2)
+        else:
+            self.upsample = None
 
     def forward(self, x):
         #print('we are upsampling gc basic layer')
