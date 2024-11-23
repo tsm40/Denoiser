@@ -21,7 +21,11 @@ class SUNet_model(nn.Module):
                                drop_path_rate=config['SWINUNET']['DROP_PATH_RATE'],
                                ape=config['SWINUNET']['APE'],
                                patch_norm=config['SWINUNET']['PATCH_NORM'],
-                               use_checkpoint=config['SWINUNET']['USE_CHECKPOINTS'])
+                               use_checkpoint=config['SWINUNET']['USE_CHECKPOINTS'],
+                               context_ratio=config['SWINUNET']['CONTEXT_RATIO'],
+                               context_pooling_type=config['SWINUNET']['CONTEXT_POOLING_TYPE'],
+                               context_fusion_types=config['SWINUNET']['CONTEXT_FUSION_TYPES'],
+                               cross_attn_type=config['SWINUNET']['CROSS_ATTN_TYPE'])
 
     def forward(self, x):
         if x.size()[1] == 1:

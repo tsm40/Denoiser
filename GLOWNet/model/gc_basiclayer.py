@@ -34,7 +34,6 @@ class ContextBlock(nn.Module):
         valid_fusion_types = ['channel_add', 'channel_mul']
         assert all([f in valid_fusion_types for f in fusion_types])
         assert len(fusion_types) > 0, 'at least one fusion should be used'
-        #inplanes = 96                 # TEMP HARDCODING INPLANES
         self.inplanes = inplanes
         self.ratio = ratio
         self.planes = int(inplanes * ratio)
@@ -209,7 +208,7 @@ class GlobalContextBasicLayer(nn.Module):
         #print('we making a gc basic layer')
         super(GlobalContextBasicLayer, self).__init__()
         self.dim = dim
-        depth = 2      # TEMP HARDCODING DEPTH
+        # depth = 2      # TEMP HARDCODING DEPTH
         self.depth = depth
         self.use_checkpoint = use_checkpoint
         #self.norm = nn.BatchNorm2d(96)  # inplanes

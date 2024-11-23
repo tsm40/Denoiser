@@ -158,9 +158,10 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
                 with autocast(dtype=torch.bfloat16):
                     restored = model_restored(input_)
 
-            for res, tar in zip(restored, target):
-                psnr_val_rgb.append(utils.torchPSNR(res, tar))
-                ssim_val_rgb.append(utils.torchSSIM(res, tar))
+
+                    for res, tar in zip(restored, target):
+                        psnr_val_rgb.append(utils.torchPSNR(res, tar))
+                        ssim_val_rgb.append(utils.torchSSIM(restored, target))
 
         psnr_val_rgb = torch.stack(psnr_val_rgb).mean().item()
         ssim_val_rgb = torch.stack(ssim_val_rgb).mean().item()
