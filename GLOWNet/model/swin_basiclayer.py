@@ -286,7 +286,7 @@ class BasicLayerWithContext(nn.Module):
         ])
 
         if gc_downsample is not None:
-            self.gc_downsample = gc_downsample(dim, dim * 2, norm_layer=norm_layer)
+            self.gc_downsample = gc_downsample(dim, dim * 2)
         else:
             self.gc_downsample = None
 
@@ -305,7 +305,7 @@ class BasicLayerWithContext(nn.Module):
         if cross_attn_args is None:
             cross_attn_args = {}
         # Ensure necessary arguments are included
-        cross_attn_args.setdefault('dim', dim)
+        cross_attn_args.setdefault('dim', dim * 2) # downsampled
         cross_attn_args.setdefault('num_heads', num_heads)
 
         # Initialize cross-attention layer
