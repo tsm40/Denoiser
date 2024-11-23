@@ -4,7 +4,9 @@ import torch.nn.functional as F
 import math
 from timm.models.layers import to_2tuple, trunc_normal_
 from .bottleneck import Bottleneck
-from .swin_basiclayer import * 
+from .cross_attn import *
+from .swin_basiclayer import *
+from .gc_basiclayer import *
 
 class PatchEmbed(nn.Module):
     r""" Image to Patch Embedding
@@ -53,7 +55,214 @@ class PatchEmbed(nn.Module):
             flops += Ho * Wo * self.embed_dim
         return flops
 
+class BasicLayerWithContext(nn.Module):
 
+    def __init__(self, dim, input_resolution, depth, num_heads, window_size,
+                 mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0.,
+                 drop_path=0., norm_layer=nn.LayerNorm, downsample=None, gc_downsample=None, use_checkpoint=False,
+                 context_ratio=1./16, context_pooling_type='att', context_fusion_types=('channel_add', ),
+                 cross_attn_type='CrossAttentionLayer', cross_attn_args=None):
+        super().__init__()
+        self.dim = dim
+        self.input_resolution = input_resolution
+        self.depth = depth
+        self.use_checkpoint = use_checkpoint
+
+        # Calculate context block depth (1/3 of Swin blocks' depth)
+        self.context_depth = max(1, depth // 3)
+
+        # Build Swin Transformer blocks
+        self.blocks = nn.ModuleList([
+            SwinTransformerBlock(
+                dim=dim,
+                input_resolution=input_resolution,
+                num_heads=num_heads,
+                window_size=window_size,
+                shift_size=0 if (i % 2 == 0) else window_size // 2,
+                mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias,
+                qk_scale=qk_scale,
+                drop=drop,
+                attn_drop=attn_drop,
+                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
+                norm_layer=norm_layer
+            ) for i in range(depth)
+        ])
+
+        # Swin blocks' downsampling layer
+        if downsample is not None:
+            self.downsample = downsample(input_resolution, dim=dim, norm_layer=norm_layer)
+        else:
+            self.downsample = None
+
+        # Build ContextBlocks
+        self.context_blocks = nn.ModuleList([
+            ContextBlock(
+                inplanes=dim,
+                ratio=context_ratio,
+                pooling_type=context_pooling_type,
+                fusion_types=context_fusion_types
+            ) for _ in range(self.context_depth)
+        ])
+
+        if gc_downsample is not None:
+            self.gc_downsample = gc_downsample(dim, dim * 2)
+        else:
+            self.gc_downsample = None
+
+        # Cross-Attention Layer Selection
+        cross_attn_classes = {
+            'CrossAttentionLayer': CrossAttentionLayer,
+            'CrossAttentionWithGating': CrossAttentionWithGating,
+            'CrossAttentionWithPositionalEncoding': CrossAttentionWithPositionalEncoding,
+            'GatedCrossAttentionWithPositionalEncoding': GatedCrossAttentionWithPositionalEncoding,
+            'RoPEMultiheadAttention': RoPEMultiheadAttention
+        }
+
+        assert cross_attn_type in cross_attn_classes, f"Invalid cross attention type: {cross_attn_type}"
+        cross_attn_class = cross_attn_classes[cross_attn_type]
+
+        if cross_attn_args is None:
+            cross_attn_args = {}
+        # Ensure necessary arguments are included
+        cross_attn_dim = dim 
+        if downsample:
+            cross_attn_dim = cross_attn_dim * 2
+        cross_attn_args.setdefault('dim', cross_attn_dim) # downsampled
+        cross_attn_args.setdefault('num_heads', num_heads)
+
+        # Initialize cross-attention layer
+        self.cross_attention = cross_attn_class(**cross_attn_args)
+
+    def forward(self, x, gc_x):
+        # Process input through Swin Transformer blocks
+        for blk in self.blocks:
+            if self.use_checkpoint:
+                x = checkpoint.checkpoint(blk, x)
+            else:
+                x = blk(x)
+        if self.downsample is not None:
+            x = self.downsample(x)
+
+        # Process through ContextBlocks
+        for cb in self.context_blocks:
+            if self.use_checkpoint:
+                gc_x = checkpoint.checkpoint(cb, gc_x)
+            else:
+                gc_x = cb(gc_x)
+        if self.gc_downsample is not None:
+            gc_x = self.gc_downsample(gc_x)
+        # print(f"Context Layer Down gc_x {gc_x.shape}")
+        # Apply Cross-Attention Layer
+        x = self.cross_attention(x, gc_x)
+
+        return x, gc_x
+
+class BasicLayerUpWithContext(nn.Module):
+
+    def __init__(self, dim, input_resolution, depth, num_heads, window_size,
+                 mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0.,
+                 drop_path=0., norm_layer=nn.LayerNorm, upsample=None, gc_upsample = None, use_checkpoint=False,
+                 context_ratio=1./16, context_pooling_type='att', context_fusion_types=('channel_add', ),
+                 cross_attn_type='CrossAttentionLayer', cross_attn_args=None):
+        super().__init__()
+        self.dim = dim
+        self.input_resolution = input_resolution
+        self.depth = depth
+        self.use_checkpoint = use_checkpoint
+
+        # Calculate context block depth (1/3 of Swin blocks' depth)
+        self.context_depth = max(1, depth // 3)
+
+        # Build Swin Transformer blocks
+        self.blocks = nn.ModuleList([
+            SwinTransformerBlock(
+                dim=dim,
+                input_resolution=input_resolution,
+                num_heads=num_heads,
+                window_size=window_size,
+                shift_size=0 if (i % 2 == 0) else window_size // 2,
+                mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias,
+                qk_scale=qk_scale,
+                drop=drop,
+                attn_drop=attn_drop,
+                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
+                norm_layer=norm_layer
+            ) for i in range(depth)
+        ])
+
+        # Swin blocks' upsampling layer
+        if upsample is not None:
+            self.upsample = UpSample(input_resolution, in_channels=dim, scale_factor=2)
+        else:
+            self.upsample = None
+
+        # Build ContextBlocks
+        self.context_blocks = nn.ModuleList([
+            ContextBlock(
+                inplanes=dim,
+                ratio=context_ratio,
+                pooling_type=context_pooling_type,
+                fusion_types=context_fusion_types
+            ) for _ in range(self.context_depth)
+        ])
+
+        # ContextBlocks' upsampling layer
+        if gc_upsample is not None:
+            self.context_upsample = gc_upsample(in_channels=dim, scale_factor=2)
+        else:
+            self.context_upsample = None
+
+        # Cross-Attention Layer Selection
+        cross_attn_classes = {
+            'CrossAttentionLayer': CrossAttentionLayer,
+            'CrossAttentionWithGating': CrossAttentionWithGating,
+            'CrossAttentionWithPositionalEncoding': CrossAttentionWithPositionalEncoding,
+            'GatedCrossAttentionWithPositionalEncoding': GatedCrossAttentionWithPositionalEncoding,
+            'RoPEMultiheadAttention': RoPEMultiheadAttention
+        }
+
+        assert cross_attn_type in cross_attn_classes, f"Invalid cross attention type: {cross_attn_type}"
+        cross_attn_class = cross_attn_classes[cross_attn_type]
+
+        if cross_attn_args is None:
+            cross_attn_args = {}
+
+        cross_attn_dim = dim 
+        if upsample:
+            cross_attn_dim = cross_attn_dim // 2
+        cross_attn_args.setdefault('dim', cross_attn_dim) # downsampled
+        cross_attn_args.setdefault('num_heads', num_heads)
+
+        # Initialize cross-attention layer
+        self.cross_attention = cross_attn_class(**cross_attn_args)
+
+    def forward(self, x, gc_x):
+        # Process input through Swin Transformer blocks
+        for blk in self.blocks:
+            if self.use_checkpoint:
+                x = checkpoint.checkpoint(blk, x)
+            else:
+                x = blk(x)
+        if self.upsample is not None:
+            x = self.upsample(x)
+
+        # Process through ContextBlocks
+        for cb in self.context_blocks:
+            if self.use_checkpoint:
+                gc_x = checkpoint.checkpoint(cb, gc_x)
+            else:
+                gc_x = cb(gc_x)
+        if self.context_upsample is not None:
+            gc_x = self.context_upsample(gc_x)
+        
+        # print(f"Context Layer Up gc_x {gc_x.shape}")
+        # Apply Cross-Attention Layer
+        x = self.cross_attention(x, gc_x)
+
+        return x, gc_x
+    
 class SUNet(nn.Module):
     r""" Swin Transformer UNet (SUNet)
         A PyTorch implementation that integrates Swin Transformer blocks with context blocks and cross-attention layers.
@@ -147,6 +356,7 @@ class SUNet(nn.Module):
                 drop_path=dpr[sum(depths[:i_layer]):sum(depths[:i_layer + 1])],
                 norm_layer=norm_layer,
                 downsample=PatchMerging if (i_layer < self.num_layers - 1) else None,
+                gc_downsample=DownsamplingBlock if (i_layer < self.num_layers - 1) else None,
                 use_checkpoint=use_checkpoint,
                 # New arguments for context blocks
                 context_ratio=context_ratio,
@@ -180,13 +390,22 @@ class SUNet(nn.Module):
 
         # build decoder layers
         self.layers_up = nn.ModuleList()
+        self.gc_up = GCUpSample(
+            in_channels=int(embed_dim * 2 ** (self.num_layers - 1)),
+            scale_factor=2)
         self.concat_back_dim = nn.ModuleList()
+        self.gc_concat_back_dim = nn.ModuleList()
         for i_layer in range(self.num_layers):
             concat_linear = nn.Linear(
                 2 * int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)),
                 int(embed_dim * 2 ** (self.num_layers - 1 - i_layer))
             ) if i_layer > 0 else nn.Identity()
             
+            gc_concat = nn.Conv2d(
+                2 * int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)),
+                int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)), 3, 1, 1
+            ) if i_layer > 0 else nn.Identity()
+
             if i_layer == 0:
                 # For the first layer, use UpSample directly
                 layer_up = UpSample(
@@ -216,6 +435,7 @@ class SUNet(nn.Module):
                     ],
                     norm_layer=norm_layer,
                     upsample=UpSample if (i_layer < self.num_layers - 1) else None,
+                    gc_upsample=GCUpSample if (i_layer < self.num_layers - 1) else None,
                     use_checkpoint=use_checkpoint,
                     # New arguments for context blocks
                     context_ratio=context_ratio,
@@ -227,9 +447,12 @@ class SUNet(nn.Module):
                 )
             self.layers_up.append(layer_up)
             self.concat_back_dim.append(concat_linear)
+            self.gc_concat_back_dim.append(gc_concat)
 
         self.norm = norm_layer(self.num_features)
+        self.gc_norm = nn.BatchNorm2d(self.num_features)
         self.norm_up = norm_layer(self.embed_dim)
+        self.gc_norm_up = nn.BatchNorm2d(self.embed_dim)
 
         if self.final_upsample == "Dual up-sample":
             self.up = UpSample(input_resolution=(img_size // patch_size, img_size // patch_size),
@@ -272,22 +495,28 @@ class SUNet(nn.Module):
             x, gc_x = layer(x, gc_x)
 
         x = self.norm(x)  # B L C
-        gc_x = self.norm(gc_x)
-        return x, residual, x_downsample
+        gc_x = self.gc_norm(gc_x)
+        return x, x_downsample, gc_x, gc_downsample
 
     # Dencoder and Skip connection
     def forward_up_features(self, x, x_downsample, gc_x, gc_downsample):
+        #print(f'x {x.shape} gc {gc_x.shape}')
+        
+        #for d, gcd in zip(x_downsample, gc_downsample):
+        #    print(f'd {d.shape} gc_d {gcd.shape}')
         for inx, layer_up in enumerate(self.layers_up):
             if inx == 0:
-                x, gc_x = layer_up(x, gc_x)
+                x = layer_up(x)
+                gc_x = self.gc_up(gc_x)
             else:
                 x = torch.cat([x, x_downsample[3 - inx]], -1)  # concat last dimension
                 gc_x = torch.cat([gc_x, gc_downsample[3 - inx]], 1)
                 x = self.concat_back_dim[inx](x)
-                x = layer_up(x)
+                gc_x = self.gc_concat_back_dim[inx](gc_x)
+                x, gc_x = layer_up(x, gc_x)
 
         x = self.norm_up(x)  # B L C
-
+        gc_x = self.gc_norm_up(gc_x)
         return x
 
     def up_x4(self, x):
@@ -305,13 +534,12 @@ class SUNet(nn.Module):
     def forward(self, x):
         #print(f'initial {x.shape}')
 
-        x = self.conv_first(x) # obtain first feature map
-        gc_x = self.gc_conv_first(x)
+        x, gc_x = self.conv_first(x), self.gc_conv_first(x) # obtain first feature map
 
         #print(f'after frist conv {x.shape}')
-        x, residual, x_downsample = self.forward_features(x, gc_x)
+        x, x_downsample, gc_x, gc_downsample = self.forward_features(x, gc_x)
         #x = self.bottleneck(x)
-        x = self.forward_up_features(x, x_downsample)
+        x = self.forward_up_features(x, x_downsample, gc_x, gc_downsample)
         x = self.up_x4(x)
         out = self.output(x)
         # x = x + residual

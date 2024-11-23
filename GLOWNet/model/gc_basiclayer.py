@@ -34,7 +34,7 @@ class ContextBlock(nn.Module):
         valid_fusion_types = ['channel_add', 'channel_mul']
         assert all([f in valid_fusion_types for f in fusion_types])
         assert len(fusion_types) > 0, 'at least one fusion should be used'
-        inplanes = 96                 # TEMP HARDCODING INPLANES
+        #inplanes = 96                 # TEMP HARDCODING INPLANES
         self.inplanes = inplanes
         self.ratio = ratio
         self.planes = int(inplanes * ratio)
@@ -121,7 +121,6 @@ class ContextBlock(nn.Module):
             out = out + channel_add_term
 
         return out
-
 class DownsamplingBlock(nn.Module):
     def __init__(self, in_channels, out_channels, norm_layer=nn.BatchNorm2d):
         super(DownsamplingBlock, self).__init__()

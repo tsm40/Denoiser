@@ -20,6 +20,13 @@ SWINUNET:
   PATCH_NORM: True
   USE_CHECKPOINTS: False
   FINAL_UPSAMPLE: 'Dual up-sample'
+  # Parameters for Context Blocks
+  CONTEXT_RATIO: 0.0625                    # Equivalent to 1/16
+  CONTEXT_POOLING_TYPE: 'att'              # Attention pooling
+  CONTEXT_FUSION_TYPES: ['channel_add']    # Fusion type
+
+  # Parameters for Cross-Attention Layers
+  CROSS_ATTN_TYPE: 'CrossAttentionLayer'  # Type of cross-attention layer
 
 MODEL:
   MODE: 'Denoising'

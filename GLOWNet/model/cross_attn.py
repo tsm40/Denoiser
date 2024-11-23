@@ -40,6 +40,9 @@ class CrossAttentionLayer(nn.Module):
         """
         B, L, C_local = x_local.shape
         B_global, C_global, H_global, W_global = x_global.shape
+        pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
+        x_global = pool(x_global)
+        B_global, C_global, H_global, W_global = x_global.shape
 
         # Reshape x_global to (B, L_global, C_global)
         x_global = x_global.view(B_global, C_global, -1).transpose(1, 2)  # Shape: (B, L_global, C_global)
@@ -102,6 +105,9 @@ class CrossAttentionWithGating(nn.Module):
         global_feat: Tensor of shape (n, dim, h, w)
         """
         n, num_patches, dim = local_feat.shape
+        B_global, C_global, H_global, W_global = x_global.shape
+        pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
+        x_global = pool(x_global)
         n, dim, h, w = global_feat.shape
 
         # Step 1: Flatten the spatial dimensions of global features
@@ -119,6 +125,7 @@ class CrossAttentionWithGating(nn.Module):
         K = K.view(n, h * w, self.num_heads, self.dim_head).transpose(1, 2)        # (n, num_heads, h*w, dim_head)
         V = V.view(n, h * w, self.num_heads, self.dim_head).transpose(1, 2)        # (n, num_heads, h*w, dim_head)
 
+        print(f'Q {Q.shape} K {K.shape} V {V.shape}')
         # Step 5: Compute scaled dot-product attention scores
         attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.dim_head)  # (n, num_heads, num_patches, h*w)
 
@@ -205,6 +212,9 @@ class CrossAttentionWithPositionalEncoding(nn.Module):
         Returns enhanced local features of shape (n, N_p, d)
         """
         n, N_p, d = local_feat.shape
+        B_global, C_global, H_global, W_global = x_global.shape
+        pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
+        x_global = pool(x_global)
         n, d, H, W = global_feat.shape
 
         # Step 1: Flatten global features
@@ -304,6 +314,9 @@ class GatedCrossAttentionWithPositionalEncoding(nn.Module):
         Returns enhanced local features of shape (n, N_p, d)
         """
         n, N_p, d = local_feat.shape
+        B_global, C_global, H_global, W_global = x_global.shape
+        pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
+        x_global = pool(x_global)
         n, d, H, W = global_feat.shape
 
         # Step 1: Flatten global features
@@ -403,6 +416,9 @@ class RoPEMultiheadAttention(nn.Module):
         Returns enhanced local features of shape (n, N_p, d)
         """
         n, N_p, d = local_feat.shape
+        B_global, C_global, H_global, W_global = x_global.shape
+        pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
+        x_global = pool(x_global)
         n, d, H, W = global_feat.shape
 
         # Step 1: Flatten global features
