@@ -20,7 +20,7 @@ Our experiments on benchmark datasets demonstrate that the proposed modification
 ## 🚀 **Key Features**
 - **Global Context Network**: Captures both local and global dependencies for better scene understanding.
 - **Denoising Head**: Enhances feature robustness by reducing noise within the bottleneck layer.
-- **Attention Mechanism**: Improves performance by emphasizing critical features during feature propagation.
+- **Attention Mechanism**: Uses cross attention mechanism for merging swin transformer local features with global context global features 
 
 ---
 

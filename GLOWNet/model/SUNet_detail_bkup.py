@@ -55,44 +55,37 @@ class PatchEmbed(nn.Module):
 
 
 class SUNet(nn.Module):
-    r""" Swin Transformer UNet (SUNet)
-        A PyTorch implementation that integrates Swin Transformer blocks with context blocks and cross-attention layers.
+    r""" Swin Transformer
+        A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
+          https://arxiv.org/pdf/2103.14030
 
     Args:
-        img_size (int | tuple(int)): Input image size. Default: 224
+        img_size (int | tuple(int)): Input image size. Default 224
         patch_size (int | tuple(int)): Patch size. Default: 4
         in_chans (int): Number of input image channels. Default: 3
-        out_chans (int): Number of output image channels. Default: 3
+
         embed_dim (int): Patch embedding dimension. Default: 96
         depths (tuple(int)): Depth of each Swin Transformer layer.
         num_heads (tuple(int)): Number of attention heads in different layers.
         window_size (int): Window size. Default: 7
-        mlp_ratio (float): Ratio of MLP hidden dim to embedding dim. Default: 4
+        mlp_ratio (float): Ratio of mlp hidden dim to embedding dim. Default: 4
         qkv_bias (bool): If True, add a learnable bias to query, key, value. Default: True
         qk_scale (float): Override default qk scale of head_dim ** -0.5 if set. Default: None
         drop_rate (float): Dropout rate. Default: 0
         attn_drop_rate (float): Attention dropout rate. Default: 0
         drop_path_rate (float): Stochastic depth rate. Default: 0.1
-        norm_layer (nn.Module): Normalization layer. Default: nn.LayerNorm
+        norm_layer (nn.Module): Normalization layer. Default: nn.LayerNorm.
         ape (bool): If True, add absolute position embedding to the patch embedding. Default: False
         patch_norm (bool): If True, add normalization after patch embedding. Default: True
-        use_checkpoint (bool): Whether to use gradient checkpointing to save memory. Default: False
-        final_upsample (str): Final upsampling method. Default: "Dual up-sample"
-        context_ratio (float): Ratio parameter for ContextBlock. Default: 1./16
-        context_pooling_type (str): Pooling type for ContextBlock ('att' or 'avg'). Default: 'att'
-        context_fusion_types (tuple(str)): Fusion types for ContextBlock. Default: ('channel_add', )
-        cross_attn_type (str): Type of cross-attention layer to use. Default: 'CrossAttentionLayer'
-        cross_attn_args (dict): Additional arguments for the cross-attention layer. Default: None
+        use_checkpoint (bool): Whether to use checkpointing to save memory. Default: False
     """
 
     def __init__(self, img_size=224, patch_size=4, in_chans=3, out_chans=3,
-                 embed_dim=96, depths=(2, 2, 2, 2), num_heads=(3, 6, 12, 24),
+                 embed_dim=96, depths=[2, 2, 2, 2], num_heads=[3, 6, 12, 24],
                  window_size=7, mlp_ratio=4., qkv_bias=True, qk_scale=None,
                  drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
-                 use_checkpoint=False, final_upsample="Dual up-sample",
-                 context_ratio=1./16, context_pooling_type='att', context_fusion_types=('channel_add', ),
-                 cross_attn_type='CrossAttentionLayer', cross_attn_args=None, **kwargs):
+                 use_checkpoint=False, final_upsample="Dual up-sample", **kwargs):
         super(SUNet, self).__init__()
 
         self.out_chans = out_chans
@@ -130,32 +123,19 @@ class SUNet(nn.Module):
         self.layers = nn.ModuleList()
         self.gc_layers = nn.ModuleList()
         for i_layer in range(self.num_layers):
-            layer = BasicLayerWithContext(
-                dim=int(embed_dim * 2 ** i_layer),
-                input_resolution=(
-                    patches_resolution[0] // (2 ** i_layer),
-                    patches_resolution[1] // (2 ** i_layer)
-                ),
-                depth=depths[i_layer],
-                num_heads=num_heads[i_layer],
-                window_size=window_size,
-                mlp_ratio=self.mlp_ratio,
-                qkv_bias=qkv_bias,
-                qk_scale=qk_scale,
-                drop=drop_rate,
-                attn_drop=attn_drop_rate,
-                drop_path=dpr[sum(depths[:i_layer]):sum(depths[:i_layer + 1])],
-                norm_layer=norm_layer,
-                downsample=PatchMerging if (i_layer < self.num_layers - 1) else None,
-                use_checkpoint=use_checkpoint,
-                # New arguments for context blocks
-                context_ratio=context_ratio,
-                context_pooling_type=context_pooling_type,
-                context_fusion_types=context_fusion_types,
-                # New arguments for cross-attention layers
-                cross_attn_type=cross_attn_type,
-                cross_attn_args=cross_attn_args
-            )
+            layer = BasicLayer(dim=int(embed_dim * 2 ** i_layer),
+                               input_resolution=(patches_resolution[0] // (2 ** i_layer),
+                                                 patches_resolution[1] // (2 ** i_layer)),
+                               depth=depths[i_layer],
+                               num_heads=num_heads[i_layer],
+                               window_size=window_size,
+                               mlp_ratio=self.mlp_ratio,
+                               qkv_bias=qkv_bias, qk_scale=qk_scale,
+                               drop=drop_rate, attn_drop=attn_drop_rate,
+                               drop_path=dpr[sum(depths[:i_layer]):sum(depths[:i_layer + 1])],
+                               norm_layer=norm_layer,
+                               downsample=PatchMerging if (i_layer < self.num_layers - 1) else None,
+                               use_checkpoint=use_checkpoint)
             self.layers.append(layer)
 
 
@@ -182,49 +162,28 @@ class SUNet(nn.Module):
         self.layers_up = nn.ModuleList()
         self.concat_back_dim = nn.ModuleList()
         for i_layer in range(self.num_layers):
-            concat_linear = nn.Linear(
-                2 * int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)),
-                int(embed_dim * 2 ** (self.num_layers - 1 - i_layer))
-            ) if i_layer > 0 else nn.Identity()
-            
+            concat_linear = nn.Linear(2 * int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)),
+                                      int(embed_dim * 2 ** (
+                                              self.num_layers - 1 - i_layer))) if i_layer > 0 else nn.Identity()
             if i_layer == 0:
-                # For the first layer, use UpSample directly
-                layer_up = UpSample(
-                    input_resolution=patches_resolution[0] // (2 ** (self.num_layers - 1 - i_layer)),
-                    in_channels=int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)),
-                    scale_factor=2
-                )
+                layer_up = UpSample(input_resolution=patches_resolution[0] // (2 ** (self.num_layers - 1 - i_layer)),
+                                    in_channels=int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)), scale_factor=2)
             else:
-                # For subsequent layers, use BasicLayerUpWithContext
-                layer_up = BasicLayerUpWithContext(
-                    dim=int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)),
-                    input_resolution=(
-                        patches_resolution[0] // (2 ** (self.num_layers - 1 - i_layer)),
-                        patches_resolution[1] // (2 ** (self.num_layers - 1 - i_layer))
-                    ),
-                    depth=depths[(self.num_layers - 1 - i_layer)],
-                    num_heads=num_heads[(self.num_layers - 1 - i_layer)],
-                    window_size=window_size,
-                    mlp_ratio=self.mlp_ratio,
-                    qkv_bias=qkv_bias,
-                    qk_scale=qk_scale,
-                    drop=drop_rate,
-                    attn_drop=attn_drop_rate,
-                    drop_path=dpr[
-                        sum(depths[:(self.num_layers - 1 - i_layer)]):
-                        sum(depths[:(self.num_layers - 1 - i_layer) + 1])
-                    ],
-                    norm_layer=norm_layer,
-                    upsample=UpSample if (i_layer < self.num_layers - 1) else None,
-                    use_checkpoint=use_checkpoint,
-                    # New arguments for context blocks
-                    context_ratio=context_ratio,
-                    context_pooling_type=context_pooling_type,
-                    context_fusion_types=context_fusion_types,
-                    # New arguments for cross-attention layers
-                    cross_attn_type=cross_attn_type,
-                    cross_attn_args=cross_attn_args
-                )
+                layer_up = BasicLayer_up(dim=int(embed_dim * 2 ** (self.num_layers - 1 - i_layer)),
+                                         input_resolution=(
+                                             patches_resolution[0] // (2 ** (self.num_layers - 1 - i_layer)),
+                                             patches_resolution[1] // (2 ** (self.num_layers - 1 - i_layer))),
+                                         depth=depths[(self.num_layers - 1 - i_layer)],
+                                         num_heads=num_heads[(self.num_layers - 1 - i_layer)],
+                                         window_size=window_size,
+                                         mlp_ratio=self.mlp_ratio,
+                                         qkv_bias=qkv_bias, qk_scale=qk_scale,
+                                         drop=drop_rate, attn_drop=attn_drop_rate,
+                                         drop_path=dpr[sum(depths[:(self.num_layers - 1 - i_layer)]):sum(
+                                             depths[:(self.num_layers - 1 - i_layer) + 1])],
+                                         norm_layer=norm_layer,
+                                         upsample=UpSample if (i_layer < self.num_layers - 1) else None,
+                                         use_checkpoint=use_checkpoint)
             self.layers_up.append(layer_up)
             self.concat_back_dim.append(concat_linear)
 
@@ -257,32 +216,29 @@ class SUNet(nn.Module):
         return {'relative_position_bias_table'}
 
     # Encoder and Bottleneck
-    def forward_features(self, x, gc_x):
+    def forward_features(self, x):
         residual = x
         x = self.patch_embed(x)
         if self.ape:
             x = x + self.absolute_pos_embed
         x = self.pos_drop(x)
-        gc_x = self.pos_drop(gc_x)
         x_downsample = []
-        gc_downsample = []
+
         for layer in self.layers:
             x_downsample.append(x)
-            gc_downsample.append(gc_x)
-            x, gc_x = layer(x, gc_x)
+            x = layer(x)
 
         x = self.norm(x)  # B L C
-        gc_x = self.norm(gc_x)
+
         return x, residual, x_downsample
 
     # Dencoder and Skip connection
-    def forward_up_features(self, x, x_downsample, gc_x, gc_downsample):
+    def forward_up_features(self, x, x_downsample):
         for inx, layer_up in enumerate(self.layers_up):
             if inx == 0:
-                x, gc_x = layer_up(x, gc_x)
+                x = layer_up(x)
             else:
                 x = torch.cat([x, x_downsample[3 - inx]], -1)  # concat last dimension
-                gc_x = torch.cat([gc_x, gc_downsample[3 - inx]], 1)
                 x = self.concat_back_dim[inx](x)
                 x = layer_up(x)
 
@@ -306,10 +262,9 @@ class SUNet(nn.Module):
         #print(f'initial {x.shape}')
 
         x = self.conv_first(x) # obtain first feature map
-        gc_x = self.gc_conv_first(x)
 
         #print(f'after frist conv {x.shape}')
-        x, residual, x_downsample = self.forward_features(x, gc_x)
+        x, residual, x_downsample = self.forward_features(x)
         #x = self.bottleneck(x)
         x = self.forward_up_features(x, x_downsample)
         x = self.up_x4(x)
