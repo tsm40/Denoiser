@@ -17,7 +17,7 @@ from data_RGB import get_training_data, get_validation_data
 from warmup_scheduler import GradualWarmupScheduler
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
-from model.SUNet import SUNet_model
+from model.SUNet import SUNet_model, GLOWNet_model
 
 ## Set Seeds
 torch.backends.cudnn.benchmark = True

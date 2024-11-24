@@ -105,9 +105,9 @@ class CrossAttentionWithGating(nn.Module):
         global_feat: Tensor of shape (n, dim, h, w)
         """
         n, num_patches, dim = local_feat.shape
-        B_global, C_global, H_global, W_global = x_global.shape
+        B_global, C_global, H_global, W_global = global_feat.shape
         pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
-        x_global = pool(x_global)
+        global_feat = pool(global_feat)
         n, dim, h, w = global_feat.shape
 
         # Step 1: Flatten the spatial dimensions of global features
@@ -125,7 +125,7 @@ class CrossAttentionWithGating(nn.Module):
         K = K.view(n, h * w, self.num_heads, self.dim_head).transpose(1, 2)        # (n, num_heads, h*w, dim_head)
         V = V.view(n, h * w, self.num_heads, self.dim_head).transpose(1, 2)        # (n, num_heads, h*w, dim_head)
 
-        print(f'Q {Q.shape} K {K.shape} V {V.shape}')
+        #print(f'Q {Q.shape} K {K.shape} V {V.shape}')
         # Step 5: Compute scaled dot-product attention scores
         attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.dim_head)  # (n, num_heads, num_patches, h*w)
 
@@ -212,9 +212,9 @@ class CrossAttentionWithPositionalEncoding(nn.Module):
         Returns enhanced local features of shape (n, N_p, d)
         """
         n, N_p, d = local_feat.shape
-        B_global, C_global, H_global, W_global = x_global.shape
+        B_global, C_global, H_global, W_global = global_feat.shape
         pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
-        x_global = pool(x_global)
+        global_feat = pool(global_feat)
         n, d, H, W = global_feat.shape
 
         # Step 1: Flatten global features
@@ -314,9 +314,9 @@ class GatedCrossAttentionWithPositionalEncoding(nn.Module):
         Returns enhanced local features of shape (n, N_p, d)
         """
         n, N_p, d = local_feat.shape
-        B_global, C_global, H_global, W_global = x_global.shape
+        B_global, C_global, H_global, W_global = global_feat.shape
         pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
-        x_global = pool(x_global)
+        global_feat = pool(global_feat)
         n, d, H, W = global_feat.shape
 
         # Step 1: Flatten global features
@@ -403,9 +403,6 @@ class RoPEMultiheadAttention(nn.Module):
         self.k_proj = nn.Linear(dim, dim)
         self.v_proj = nn.Linear(dim, dim)
 
-        # Linear layer for gating mechanism
-        self.gate_proj = nn.Linear(dim * 2, dim)
-
         # Output projection
         self.out_proj = nn.Linear(dim, dim)
 
@@ -416,9 +413,9 @@ class RoPEMultiheadAttention(nn.Module):
         Returns enhanced local features of shape (n, N_p, d)
         """
         n, N_p, d = local_feat.shape
-        B_global, C_global, H_global, W_global = x_global.shape
+        B_global, C_global, H_global, W_global = global_feat.shape
         pool = torch.nn.AdaptiveAvgPool2d((H_global//4, W_global//4))
-        x_global = pool(x_global)
+        global_feat = pool(global_feat)
         n, d, H, W = global_feat.shape
 
         # Step 1: Flatten global features
@@ -458,15 +455,7 @@ class RoPEMultiheadAttention(nn.Module):
         # Step 9: Concatenate attention outputs from all heads
         attention_output = attention_output.transpose(1, 2).contiguous().view(n, N_p, d)  # (n, N_p, d)
 
-        # Step 10: Compute gating values
-        gate_input = torch.cat([local_feat, attention_output], dim=-1)  # Shape: (n, N_p, 2d)
-        gate_values = torch.sigmoid(self.gate_proj(gate_input))         # Shape: (n, N_p, d)
-
-        # Step 11: Apply gating to modulate the attention output
-        gated_attention_output = gate_values * attention_output         # Shape: (n, N_p, d)
-
-        # Step 12: Fuse attention output with local features
-        enhanced_local_feat = local_feat + gated_attention_output       # Shape: (n, N_p, d)
+        enhanced_local_feat = local_feat + attention_output       # Shape: (n, N_p, d)
 
         # Step 13: Apply output projection
         enhanced_local_feat = self.out_proj(enhanced_local_feat)        # Shape: (n, N_p, d)

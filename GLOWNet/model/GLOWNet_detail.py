@@ -263,7 +263,7 @@ class BasicLayerUpWithContext(nn.Module):
 
         return x, gc_x
     
-class SUNet(nn.Module):
+class GLOWNet(nn.Module):
     r""" Swin Transformer UNet (SUNet)
         A PyTorch implementation that integrates Swin Transformer blocks with context blocks and cross-attention layers.
 
@@ -302,7 +302,7 @@ class SUNet(nn.Module):
                  use_checkpoint=False, final_upsample="Dual up-sample",
                  context_ratio=1./16, context_pooling_type='att', context_fusion_types=('channel_add', ),
                  cross_attn_type='CrossAttentionLayer', cross_attn_args=None, **kwargs):
-        super(SUNet, self).__init__()
+        super(GLOWNet, self).__init__()
 
         self.out_chans = out_chans
         self.num_layers = len(depths)

@@ -17,7 +17,7 @@ from data_RGB import get_training_data, get_validation_data
 from warmup_scheduler import GradualWarmupScheduler
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
-from model.SUNet import SUNet_model
+from model.SUNet import SUNet_model, GLOWNet_model
 
 # Import autocast and GradScaler for mixed precision
 from torch.cuda.amp import autocast, GradScaler
@@ -37,7 +37,7 @@ OPT = opt['OPTIM']
 
 ## Build Model
 print('==> Build the model')
-model_restored = SUNet_model(opt)
+model_restored = GLOWNet_model(opt)
 p_number = network_parameters(model_restored)
 model_restored.cuda()
 
@@ -158,10 +158,10 @@ for epoch in range(start_epoch, OPT['EPOCHS'] + 1):
                 with autocast(dtype=torch.bfloat16):
                     restored = model_restored(input_)
 
-
-                    for res, tar in zip(restored, target):
-                        psnr_val_rgb.append(utils.torchPSNR(res, tar))
-                        ssim_val_rgb.append(utils.torchSSIM(restored, target))
+            restored = restored.to(target.dtype)
+            for res, tar in zip(restored, target):
+                psnr_val_rgb.append(utils.torchPSNR(res, tar))
+                ssim_val_rgb.append(utils.torchSSIM(restored, target))
 
         psnr_val_rgb = torch.stack(psnr_val_rgb).mean().item()
         ssim_val_rgb = torch.stack(ssim_val_rgb).mean().item()
