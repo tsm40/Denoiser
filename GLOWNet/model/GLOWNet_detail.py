@@ -313,7 +313,6 @@ class GLOWNet(nn.Module):
         self.num_features_up = int(embed_dim * 2)
         self.mlp_ratio = mlp_ratio
         self.final_upsample = final_upsample
-        self.prelu = nn.PReLU()
         self.conv_first = nn.Conv2d(in_chans, embed_dim, 3, 1, 1)
         self.gc_conv_first = nn.Conv2d(in_chans, embed_dim, 3, 1, 1)
 
@@ -533,8 +532,9 @@ class GLOWNet(nn.Module):
 
     def forward(self, x):
         #print(f'initial {x.shape}')
-
-        x, gc_x = self.conv_first(x), self.gc_conv_first(x) # obtain first feature map
+        gc = x 
+        x= self.conv_first(x)
+        gc_x = self.gc_conv_first(gc) # obtain first feature map
 
         #print(f'after frist conv {x.shape}')
         x, x_downsample, gc_x, gc_downsample = self.forward_features(x, gc_x)

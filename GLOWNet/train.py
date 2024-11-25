@@ -38,6 +38,13 @@ model_restored = SUNet_model(opt)
 p_number = network_parameters(model_restored)
 model_restored.cuda()
 
+cnt = 0
+for name, param in model_restored.named_parameters():
+    if param.grad is None:
+        if cnt >= 20:
+            break
+        print(f"Parameter {name} was not used in the forward pass.")
+        cnt += 1
 ## Training model path direction
 mode = opt['MODEL']['MODE']
 

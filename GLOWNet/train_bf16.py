@@ -37,7 +37,7 @@ OPT = opt['OPTIM']
 
 ## Build Model
 print('==> Build the model')
-model_restored = GLOWNet_model(opt)
+model_restored = SUNet_model(opt)
 p_number = network_parameters(model_restored)
 model_restored.cuda()
 
@@ -59,6 +59,13 @@ if torch.cuda.device_count() > 1:
 if len(device_ids) > 1:
     model_restored = nn.DataParallel(model_restored, device_ids=device_ids)
 
+cnt = 0
+for name, param in model_restored.named_parameters():
+    if param.grad is None:
+        if cnt >= 20:
+            break
+        print(f"Parameter {name} was not used in the forward pass.")
+        cnt += 1
 ## Log
 log_dir = os.path.join(Train['SAVE_DIR'], mode, 'log')
 utils.mkdir(log_dir)
@@ -74,7 +81,7 @@ warmup_epochs = 3
 scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, OPT['EPOCHS'] - warmup_epochs,
                                                         eta_min=float(OPT['LR_MIN']))
 scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=warmup_epochs, after_scheduler=scheduler_cosine)
-
+scheduler.step()
 ## Resume (Continue training by a pretrained model)
 if Train['RESUME']:
     path_chk_rest = utils.get_last_path(model_dir, '_latest.pth')
@@ -108,6 +115,7 @@ print(f'''==> Training details:
     Train patches size: {str(Train['TRAIN_PS']) + 'x' + str(Train['TRAIN_PS'])}
     Val patches size:   {str(Train['VAL_PS']) + 'x' + str(Train['VAL_PS'])}
     Model parameters:   {p_number}
+    Attn Method:        {(opt['SWINUNET']['CROSS_ATTN_TYPE'])}
     Start/End epochs:   {str(start_epoch) + '~' + str(OPT['EPOCHS'])}
     Batch sizes:        {OPT['BATCH']}
     Learning rate:      {OPT['LR_INITIAL']}
