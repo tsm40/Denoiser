@@ -29,6 +29,7 @@ from model.SUNet import SUNet_model, GLOWNet_model
 
 # Import autocast and GradScaler for mixed precision
 from torch.cuda.amp import autocast, GradScaler
+import lpips
 
 def cleanup():
     """
@@ -60,13 +61,28 @@ def create_logger(logging_dir):
         logger.addHandler(logging.NullHandler())
     return logger
 
+# --------------------------------------------
+# Charbonnier loss
+# --------------------------------------------
+class CharbonnierLoss(nn.Module):
+    """Charbonnier Loss (L1)"""
+
+    def __init__(self, eps=1e-9):
+        super(CharbonnierLoss, self).__init__()
+        self.eps = eps
+
+    def forward(self, x, y):
+        diff = x - y
+        loss = torch.mean(torch.sqrt((diff * diff) + self.eps))
+        return loss
+    
 def main(opt, Train, OPT):
     
     dist.init_process_group('nccl')
     rank = dist.get_rank()
     device = rank % torch.cuda.device_count()
-    
-    seed = 327 * dist.get_world_size() + rank 
+    world_size = dist.get_world_size() 
+    seed = 327 * world_size + rank 
     torch.manual_seed(seed)
     torch.cuda.set_device(device)
     mode = opt['MODEL']['MODE']
@@ -78,16 +94,8 @@ def main(opt, Train, OPT):
     model_restored = GLOWNet_model(opt).to(device)
     model_restored = DDP(model_restored, device_ids=[rank], find_unused_parameters=True)
 
-    cnt = 0
-    for name, param in model_restored.named_parameters():
-        if param.grad is None:
-            if cnt >= 20:
-                break
-            logger.info(f"Parameter {name} was not used in the forward pass.")
-            cnt += 1
-
     p_number = network_parameters(model_restored)
-    logger.info(f"Total {p_number}, {cnt} not used in forward")
+
     ## Training model path direction
     mode = opt['MODEL']['MODE']
 
@@ -99,7 +107,6 @@ def main(opt, Train, OPT):
     val_dataset = get_validation_data(val_dir, {'patch_size': Train['VAL_PS']})
 
 
-    world_size=2
     train_sampler = DistributedSampler(
         train_dataset, 
         num_replicas=world_size,
@@ -140,15 +147,19 @@ def main(opt, Train, OPT):
                                                             eta_min=float(OPT['LR_MIN']))
     scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=warmup_epochs, after_scheduler=scheduler_cosine)
     #scheduler.step()
-    L1_loss = nn.L1Loss()
+    L1_loss = CharbonnierLoss()
+    loss_fn_alex = lpips.LPIPS(net='alex')
+    loss_fn_alex = loss_fn_alex.to(device)
 
     # Initialize GradScaler for mixed precision
     scaler = GradScaler()
 
     best_psnr = 0
     best_ssim = 0
+    best_lpips = 1 # note 0 < lpip < 1 so this is max 
     best_epoch_psnr = 0
     best_epoch_ssim = 0
+    best_epoch_lpips = 0
     total_start_time = time.time()
 
     log_steps = 0
@@ -163,6 +174,7 @@ def main(opt, Train, OPT):
         Val patches size:   {str(Train['VAL_PS']) + 'x' + str(Train['VAL_PS'])}
         Model parameters:   {p_number}
         Attn Method:        {(opt['SWINUNET']['CROSS_ATTN_TYPE'])}
+        Context Fusion:     {(opt['SWINUNET']['CONTEXT_FUSION_TYPES'])}
         Start/End epochs:   {str(start_epoch) + '~' + str(OPT['EPOCHS'])}
         Batch sizes:        {OPT['BATCH']}
         Learning rate:      {OPT['LR_INITIAL']}''')
@@ -200,6 +212,7 @@ def main(opt, Train, OPT):
             model_restored.eval()
             psnr_val_rgb = []
             ssim_val_rgb = []
+            lpips_val = []
             for ii, data_val in enumerate(val_loader, 0):
                 target = data_val[0].cuda()
                 input_ = data_val[1].cuda()
@@ -210,10 +223,12 @@ def main(opt, Train, OPT):
                 restored = restored.to(target.dtype)
                 for res, tar in zip(restored, target):
                     psnr_val_rgb.append(utils.torchPSNR(res, tar))
-                    ssim_val_rgb.append(utils.torchSSIM(restored, target))
-
+                    lpips_val.append(loss_fn_alex.forward(res, target))
+                ssim_val_rgb.append(utils.torchSSIM(restored, target))
+                
             psnr_val_rgb = torch.stack(psnr_val_rgb).mean().item()
             ssim_val_rgb = torch.stack(ssim_val_rgb).mean().item()
+            lpips_val_rgb = torch.stack(lpips_val).mean().item()
 
             # Save the best PSNR model of validation
             if psnr_val_rgb > best_psnr:
@@ -237,6 +252,18 @@ def main(opt, Train, OPT):
             
             logger.info("[epoch %d SSIM: %.4f --- best_epoch %d Best_SSIM %.4f]" % (
                 epoch, ssim_val_rgb, best_epoch_ssim, best_ssim))
+            
+            # Save the best SSIM model of validation
+            if lpips_val_rgb < best_lpips:
+                best_lpips = lpips_val_rgb
+                best_epoch_lpips = epoch
+                torch.save({'epoch': epoch,
+                            'state_dict': model_restored.state_dict(),
+                            'optimizer': optimizer.state_dict()
+                            }, os.path.join(model_dir, "model_best_lpips.pth"))
+            
+            logger.info("[epoch %d LPIPS: %.4f --- best_epoch %d Best_LPIPS %.4f]" % (
+                epoch, lpips_val_rgb, best_epoch_lpips, best_lpips))
             dist.barrier()
 
         scheduler.step()
@@ -245,7 +272,7 @@ def main(opt, Train, OPT):
         avg_loss = torch.tensor(running_loss / log_steps, device=device)
         dist.all_reduce(avg_loss, op=dist.ReduceOp.SUM)
         avg_loss = avg_loss.item() / dist.get_world_size()
-        logger.info(f"(step={train_steps:07d}) Train Loss: {avg_loss:.4f}")
+        # logger.info(f"(step={train_steps:07d}) Train Loss: {avg_loss:.4f}")
 
         # Reset monitoring variables:
         running_loss = 0

@@ -5,3 +5,6 @@ GLOWNet/datasets/DIV2K/
 GLOWNet/datasets/Denoising_DIV2K/
 GLOWNet/checkpoints/
 GLOWNet/logs
+GLOWNet/pretrained_model
+GLOWNet/demo_results
+

@@ -42,9 +42,9 @@ def ensure_directory(path):
 
 def main():
     # Define input and output directories
-    input_dir = '/home/shared/Denoiser/SUNet/datasets/DIV2K/DIV2K_train_HR/'
-    target_dir = '/home/shared/Denoiser/SUNet/datasets/Denoising_DIV2K/train/target/'
-    input_noisy_dir = '/home/shared/Denoiser/SUNet/datasets/Denoising_DIV2K/train/input/'
+    input_dir = '/home/shared/Denoiser/GLOWNet/datasets/DIV2K/DIV2K_train_HR/'
+    target_dir = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/train/target/'
+    input_noisy_dir = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/train/input/'
 
     # Ensure output directories exist
     ensure_directory(target_dir)
@@ -72,7 +72,7 @@ def main():
             # Parameters
             a = 255  # Width of the crop
             b = 255  # Height of the crop
-            c = 100  # Number of patches per image
+            c = 20  # Number of patches per image
 
             # Check if the image is large enough
             if X <= a + 1 or Y <= b + 1:

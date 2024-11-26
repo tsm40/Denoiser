@@ -21,20 +21,20 @@ SWINUNET:
   USE_CHECKPOINTS: False
   FINAL_UPSAMPLE: 'Dual up-sample'
   # Parameters for Context Blocks
-  CONTEXT_RATIO: 0.0625                    # Equivalent to 1/16
+  CONTEXT_RATIO: 0.25                    # Equivalent to 1/16
   CONTEXT_POOLING_TYPE: 'att'              # Attention pooling
-  CONTEXT_FUSION_TYPES: ['channel_mul']    # Fusion type
+  CONTEXT_FUSION_TYPES: ['channel_mul', 'channel_add']    # Fusion type
 
   # Parameters for Cross-Attention Layers
-  CROSS_ATTN_TYPE: 'RoPEMultiheadAttention'  # Type of cross-attention layer
+  CROSS_ATTN_TYPE: 'CrossAttentionWithPositionalEncoding'  # Type of cross-attention layer
 
 MODEL:
   MODE: 'Denoising'
 
 # Optimization arguments.
 OPTIM:
-  BATCH: 16
-  EPOCHS: 100
+  BATCH: 4
+  EPOCHS: 150
   # EPOCH_DECAY: [10]
   LR_INITIAL: 2e-4
   LR_MIN: 1e-6
@@ -45,6 +45,6 @@ TRAINING:
   RESUME: False
   TRAIN_PS: 256
   VAL_PS: 256
-  TRAIN_DIR: './datasets/Denoising_DIV2K/small/train'       # path to training data
-  VAL_DIR: './datasets/Denoising_DIV2K/small/test' # path to validation data
-  SAVE_DIR: './checkpoints/RoPEMultiheadAttention/'           # path to save models and images
+  TRAIN_DIR: './datasets/Denoising_DIV2K/train'       # path to training data
+  VAL_DIR: './datasets/Denoising_DIV2K/test' # path to validation data
+  SAVE_DIR: './checkpoints/CrossAttentionWithPositionalEncoding_channelmuladd_tune/'           # path to save models and images

@@ -116,7 +116,7 @@ class BasicLayerWithContext(nn.Module):
             'CrossAttentionWithGating': CrossAttentionWithGating,
             'CrossAttentionWithPositionalEncoding': CrossAttentionWithPositionalEncoding,
             'GatedCrossAttentionWithPositionalEncoding': GatedCrossAttentionWithPositionalEncoding,
-            'RoPEMultiheadAttention': RoPEMultiheadAttention
+            'RoPEMultiheadAttention': RoPEMultiheadAttention,
         }
 
         assert cross_attn_type in cross_attn_classes, f"Invalid cross attention type: {cross_attn_type}"

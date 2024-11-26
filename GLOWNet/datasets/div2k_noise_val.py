@@ -42,9 +42,9 @@ def ensure_directory(path):
 
 def main():
     # Define input and output directories using Linux-style paths
-    file_path = '/home/shared/Denoiser/SUNet/datasets/DIV2K/DIV2K_valid_HR/'        # Clean images directory
-    target_path = '/home/shared/Denoiser/SUNet/datasets/Denoising_DIV2K/test/target/' # Clean patches output
-    input_path = '/home/shared/Denoiser/SUNet/datasets/Denoising_DIV2K/test/input/'      # Noisy patches output
+    file_path = '/home/shared/Denoiser/GLOWNet/datasets/DIV2K/DIV2K_valid_HR/'        # Clean images directory
+    target_path = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/test/target/' # Clean patches output
+    input_path = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/test/input/'      # Noisy patches output
 
     # Ensure output directories exist
     ensure_directory(target_path)

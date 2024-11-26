@@ -285,7 +285,6 @@ class CrossAttentionWithPositionalEncoding(nn.Module):
 
         return coords  # Shape: (n, height*width, 2)
     
-
 class GatedCrossAttentionWithPositionalEncoding(nn.Module):
     def __init__(self, dim, num_heads):
         super(GatedCrossAttentionWithPositionalEncoding, self).__init__()
