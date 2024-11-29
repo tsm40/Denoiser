@@ -42,9 +42,9 @@ def ensure_directory(path):
 
 def main():
     # Define input and output directories
-    input_dir = '/home/shared/Denoiser/GLOWNet/datasets/DIV2K/DIV2K_train_HR/'
-    target_dir = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/train/target/'
-    input_noisy_dir = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/train/input/'
+    input_dir = '/home/mdu/glownet/Denoiser/GLOWNet/datasets/DIV2K/train_HR/DIV2K_train_HR/'
+    target_dir = '/home/mdu/glownet/Denoiser/GLOWNet/datasets/Denoising_DIV2K/sigma50/train/target/'
+    input_noisy_dir = '/home/mdu/glownet/Denoiser/GLOWNet/datasets/Denoising_DIV2K/sigma50/train/input/'
 
     # Ensure output directories exist
     ensure_directory(target_dir)
@@ -88,7 +88,7 @@ def main():
                 C = input_image[y:y+a, x:x+b]
 
                 # Generate random sigma and compute variance
-                sig = int(np.round(np.random.rand() * 45 + 5))
+                sig = 50 # int(np.round(np.random.rand() * 45 + 5))
                 V = (sig / 256.0) ** 2
 
                 # Add Gaussian noise

@@ -4,6 +4,7 @@ import torch.utils.checkpoint as checkpoint
 from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from thop import profile
+from .bottleneck import Bottleneck
 
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
@@ -644,7 +645,25 @@ class SUNet(nn.Module):
                                downsample=PatchMerging if (i_layer < self.num_layers - 1) else None,
                                use_checkpoint=use_checkpoint)
             self.layers.append(layer)
-
+        
+        self.bottleneck = Bottleneck(
+            channels=int(embed_dim * 2 ** (i_layer)), 
+            block=BasicLayer(dim=int(embed_dim * 2 ** (i_layer)),
+                               input_resolution=(patches_resolution[0] // (2 ** i_layer),
+                                                 patches_resolution[1] // (2 ** i_layer)),
+                               depth=depths[i_layer],
+                               num_heads=num_heads[i_layer],
+                               window_size=window_size,
+                               mlp_ratio=self.mlp_ratio,
+                               qkv_bias=qkv_bias, qk_scale=qk_scale,
+                               drop=drop_rate, attn_drop=attn_drop_rate,
+                               drop_path=dpr[sum(depths[:i_layer]):sum(depths[:i_layer + 1])],
+                               norm_layer=norm_layer,
+                               downsample= None,
+                               use_checkpoint=use_checkpoint)
+        )
+        
+        
         # build decoder layers
         self.layers_up = nn.ModuleList()
         self.concat_back_dim = nn.ModuleList()
@@ -748,6 +767,7 @@ class SUNet(nn.Module):
     def forward(self, x):
         x = self.conv_first(x)
         x, residual, x_downsample = self.forward_features(x)
+        x = self.bottleneck(x)
         x = self.forward_up_features(x, x_downsample)
         x = self.up_x4(x)
         out = self.output(x)

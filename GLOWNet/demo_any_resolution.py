@@ -21,14 +21,14 @@ with open('training.yaml', 'r') as config:
 
 parser = argparse.ArgumentParser(description='Demo Image Restoration')
 
-parser.add_argument('--input_dir', default='./datasets/Ablation_dataset/datasets/Kodak24_noisy/sigma50/', type=str, help='Input images')
-parser.add_argument('--clean_dir', default='./datasets/Ablation_dataset/datasets/Kodak24/', type=str, help='Input images')
+parser.add_argument('--input_dir', default='./datasets/Ablation/datasets/Kodak24_noisy/sigma50/', type=str, help='Input images')
+parser.add_argument('--clean_dir', default='./datasets/Ablation/datasets/Kodak24/', type=str, help='Input images')
 parser.add_argument('--window_size', default=8, type=int, help='window size')
 parser.add_argument('--size', default=256, type=int, help='model image patch size')
 parser.add_argument('--stride', default=128, type=int, help='reconstruction stride')
 parser.add_argument('--result_dir', default='./demo_results/sigma50/', type=str, help='Directory for results')
 parser.add_argument('--weights',
-                    default='./pretrained_model/model_bestPSNR.pth', type=str,
+                    default='./pretrained_model/sigma50/model_bestPSNR.pth', type=str,
                     help='Path to weights')
 
 args = parser.parse_args()
@@ -83,9 +83,9 @@ files = natsorted(glob(os.path.join(inp_dir, '*.jpg'))
                   + glob(os.path.join(inp_dir, '*.PNG')))
 
 clean_files = natsorted(glob(os.path.join(clean_dir, '*.jpg'))
-                  + glob(os.path.join(inp_dir, '*.JPG'))
-                  + glob(os.path.join(inp_dir, '*.png'))
-                  + glob(os.path.join(inp_dir, '*.PNG')))
+                  + glob(os.path.join(clean_dir, '*.JPG'))
+                  + glob(os.path.join(clean_dir, '*.png'))
+                  + glob(os.path.join(clean_dir, '*.PNG')))
 if len(files) == 0:
     raise Exception(f"No files found at {inp_dir}")
 
@@ -101,11 +101,6 @@ print('restoring images......')
 stride = args.stride
 model_img = args.size
 
-psnr_val_rgb = []
-ssim_val_rgb = []
-lpips_val = []
-cnt = 0 
-
 for file_, clean_file_ in zip(files, clean_files):
     img = Image.open(file_).convert('RGB')
     input_ = TF.to_tensor(img).unsqueeze(0).cuda()
@@ -113,6 +108,7 @@ for file_, clean_file_ in zip(files, clean_files):
     clean_img = Image.open(clean_file_).convert('RGB')
     clean_input_ = TF.to_tensor(clean_img).unsqueeze(0).cuda()
 
+    print(f'Sanity check noisy {file_} clean {clean_file_}')
     with torch.no_grad():
         # pad to multiple of 256
         square_input_, mask, max_wh = overlapped_square(input_.cuda(), kernel=model_img, stride=stride)
@@ -140,11 +136,6 @@ for file_, clean_file_ in zip(files, clean_files):
         restored /= we_mk
 
         restored = torch.masked_select(restored, mask.bool()).reshape(input_.shape)
-        print(f'img {cnt} psnr {utils.torchPSNR(restored, clean_input_)} ssim {utils.torchSSIM(restored, clean_input_)}') 
-        cnt += 1
-        psnr_val_rgb.append(utils.torchPSNR(restored, clean_input_))
-        ssim_val_rgb.append(utils.torchSSIM(restored, clean_input_))
-
         restored = torch.clamp(restored, 0, 1)
 
     restored = restored.permute(0, 2, 3, 1).cpu().detach().numpy()
@@ -153,7 +144,5 @@ for file_, clean_file_ in zip(files, clean_files):
     f = os.path.splitext(os.path.split(file_)[-1])[0]
     save_img((os.path.join(out_dir, f + '.png')), restored)
 
-psnr_val_rgb = torch.stack(psnr_val_rgb).mean().item()
-ssim_val_rgb = torch.stack(ssim_val_rgb).mean().item()
 
-print(f"Files saved at {out_dir}, Avg SSIM {ssim_val_rgb}, Avg PSNR {psnr_val_rgb}")
+print(f"Files saved at {out_dir}")

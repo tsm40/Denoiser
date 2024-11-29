@@ -112,11 +112,11 @@ class BasicLayerWithContext(nn.Module):
 
         # Cross-Attention Layer Selection
         cross_attn_classes = {
-            'CrossAttentionLayer': CrossAttentionLayer,
-            'CrossAttentionWithGating': CrossAttentionWithGating,
-            'CrossAttentionWithPositionalEncoding': CrossAttentionWithPositionalEncoding,
-            'GatedCrossAttentionWithPositionalEncoding': GatedCrossAttentionWithPositionalEncoding,
-            'RoPEMultiheadAttention': RoPEMultiheadAttention,
+            'CrossAttn': CrossAttn,
+            'GatedCrossAttn': GatedCrossAttn,
+            'PosEncCrossAttn': PosEncCrossAttn,
+            'GatedPosEncCrossAttn': GatedPosEncCrossAttn,
+            'RoPEAttn': RoPEAttn,
         }
 
         assert cross_attn_type in cross_attn_classes, f"Invalid cross attention type: {cross_attn_type}"
@@ -216,11 +216,11 @@ class BasicLayerUpWithContext(nn.Module):
 
         # Cross-Attention Layer Selection
         cross_attn_classes = {
-            'CrossAttentionLayer': CrossAttentionLayer,
-            'CrossAttentionWithGating': CrossAttentionWithGating,
-            'CrossAttentionWithPositionalEncoding': CrossAttentionWithPositionalEncoding,
-            'GatedCrossAttentionWithPositionalEncoding': GatedCrossAttentionWithPositionalEncoding,
-            'RoPEMultiheadAttention': RoPEMultiheadAttention
+            'CrossAttn': CrossAttn,
+            'GatedCrossAttn': GatedCrossAttn,
+            'PosEncCrossAttn': PosEncCrossAttn,
+            'GatedPosEncCrossAttn': GatedPosEncCrossAttn,
+            'RoPEAttn': RoPEAttn,
         }
 
         assert cross_attn_type in cross_attn_classes, f"Invalid cross attention type: {cross_attn_type}"
@@ -315,6 +315,9 @@ class GLOWNet(nn.Module):
         self.final_upsample = final_upsample
         self.conv_first = nn.Conv2d(in_chans, embed_dim, 3, 1, 1)
         self.gc_conv_first = nn.Conv2d(in_chans, embed_dim, 3, 1, 1)
+        rgb_mean = (0.4488, 0.4371, 0.4040)
+        self.mean = torch.Tensor(rgb_mean).view(1, 3, 1, 1)
+        self.img_range = 1
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed(
@@ -480,7 +483,7 @@ class GLOWNet(nn.Module):
 
     # Encoder and Bottleneck
     def forward_features(self, x, gc_x):
-        residual = x
+        residual = x 
         x = self.patch_embed(x)
         if self.ape:
             x = x + self.absolute_pos_embed
@@ -491,11 +494,14 @@ class GLOWNet(nn.Module):
         for layer in self.layers:
             x_downsample.append(x)
             gc_downsample.append(gc_x)
+            #residual = x
             x, gc_x = layer(x, gc_x)
+            #x = x + residual 
 
+        # x = x + residual
         x = self.norm(x)  # B L C
         gc_x = self.gc_norm(gc_x)
-        return x, x_downsample, gc_x, gc_downsample
+        return x, x_downsample, gc_x, gc_downsample, residual
 
     # Dencoder and Skip connection
     def forward_up_features(self, x, x_downsample, gc_x, gc_downsample):
@@ -532,17 +538,21 @@ class GLOWNet(nn.Module):
 
     def forward(self, x):
         #print(f'initial {x.shape}')
+        #self.mean = self.mean.type_as(x)
+        #x = (x - self.mean) * self.img_range
+
         gc = x 
         x= self.conv_first(x)
         gc_x = self.gc_conv_first(gc) # obtain first feature map
 
         #print(f'after frist conv {x.shape}')
-        x, x_downsample, gc_x, gc_downsample = self.forward_features(x, gc_x)
+        x, x_downsample, gc_x, gc_downsample, residual = self.forward_features(x, gc_x)
         #x = self.bottleneck(x)
         x = self.forward_up_features(x, x_downsample, gc_x, gc_downsample)
         x = self.up_x4(x)
+        #x = x + residual
         out = self.output(x)
-        # x = x + residual
+        #out = out / self.img_range + self.mean
         return out
 
     def flops(self):

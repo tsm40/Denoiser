@@ -21,7 +21,7 @@ SWINUNET:
   USE_CHECKPOINTS: False
   FINAL_UPSAMPLE: 'Dual up-sample'
   # Parameters for Context Blocks
-  CONTEXT_RATIO: 0.25
+  CONTEXT_RATIO: 0.25                    # Equivalent to 1/16
   CONTEXT_POOLING_TYPE: 'att'              # Attention pooling
   CONTEXT_FUSION_TYPES: ['channel_mul', 'channel_add']    # Fusion type
 
@@ -34,19 +34,19 @@ MODEL:
 # Optimization arguments.
 OPTIM:
   BATCH: 32
-  EPOCHS: 100
+  EPOCHS: 200
   # EPOCH_DECAY: [10]
-  LR_INITIAL: 2e-4
+  LR_INITIAL: 2e-5
   LR_MIN: 1e-6
   # BETA1: 0.9
 
 TRAINING:
   VAL_AFTER_EVERY: 1
   RESUME: False
-  FINE_TUNE: False
+  FINE_TUNE: True
   TRAIN_PS: 256
   VAL_PS: 256
-  TRAIN_DIR: './datasets/Denoising_DIV2K/1000/train'       # path to training data
-  LOAD_DIR: ''
-  VAL_DIR: './datasets/Denoising_DIV2K/1000/test' # path to validation data
-  SAVE_DIR: './checkpoints/SUNet/'           # path to save models and images
+  TRAIN_DIR: './datasets/Denoising_DIV2K/sigma10/train'       # path to training data
+  VAL_DIR: './datasets/Denoising_DIV2K/sigma10/test' # path to validation data
+  LOAD_DIR: './pretrained_model/'           # path to save models and images
+  SAVE_DIR: './checkpoints/Gated_Tune10/'           # path to save models and images

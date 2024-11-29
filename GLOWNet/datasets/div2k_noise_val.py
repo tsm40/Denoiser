@@ -42,9 +42,9 @@ def ensure_directory(path):
 
 def main():
     # Define input and output directories using Linux-style paths
-    file_path = '/home/shared/Denoiser/GLOWNet/datasets/DIV2K/DIV2K_valid_HR/'        # Clean images directory
-    target_path = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/test/target/' # Clean patches output
-    input_path = '/home/shared/Denoiser/GLOWNet/datasets/Denoising_DIV2K/test/input/'      # Noisy patches output
+    file_path = '/home/mdu/glownet/Denoiser/GLOWNet/datasets/DIV2K/valid_HR/DIV2K_valid_HR/'        # Clean images directory
+    target_path = '/home/mdu/glownet/Denoiser/GLOWNet/datasets/Denoising_DIV2K/sigma50/test/target/' # Clean patches output
+    input_path = '/home/mdu/glownet/Denoiser/GLOWNet/datasets/Denoising_DIV2K/sigma50/test/input/'      # Noisy patches output
 
     # Ensure output directories exist
     ensure_directory(target_path)
@@ -88,7 +88,7 @@ def main():
                 C = input_image[y:y+a, x:x+b]
 
                 # Define noise levels
-                sigmas = [10, 30, 50]
+                sigmas = [50]
                 variances = [(sig / 256.0) ** 2 for sig in sigmas]
 
                 for sig, var in zip(sigmas, variances):

@@ -82,6 +82,7 @@ def main(opt, Train, OPT):
     rank = dist.get_rank()
     device = rank % torch.cuda.device_count()
     world_size = dist.get_world_size() 
+    
     seed = 327 * world_size + rank 
     torch.manual_seed(seed)
     torch.cuda.set_device(device)
@@ -112,12 +113,12 @@ def main(opt, Train, OPT):
         num_replicas=world_size,
         rank=rank,
         shuffle=True,
-        seed=seed)
+        seed=327)
     train_loader = DataLoader(
         train_dataset, 
         batch_size=int(OPT['BATCH'] // world_size),
         shuffle=False,
-        num_workers=2,
+        num_workers=8,
         sampler=train_sampler,
         pin_memory=True,
         drop_last=False)
@@ -127,12 +128,12 @@ def main(opt, Train, OPT):
         num_replicas=world_size,
         rank=rank,
         shuffle=True,
-        seed=seed)
+        seed=327)
     val_loader = DataLoader(
         val_dataset, 
         batch_size=1,
         shuffle=False,
-        num_workers=2,
+        num_workers=8,
         sampler=val_sampler,
         pin_memory=True,
         drop_last=False)
@@ -146,10 +147,17 @@ def main(opt, Train, OPT):
     scheduler_cosine = optim.lr_scheduler.CosineAnnealingLR(optimizer, OPT['EPOCHS'] - warmup_epochs,
                                                             eta_min=float(OPT['LR_MIN']))
     scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=warmup_epochs, after_scheduler=scheduler_cosine)
-    #scheduler.step()
+
+    if Train['FINE_TUNE']:
+        load_dir = os.path.join(Train['LOAD_DIR'], mode, 'models')
+        path_chk_rest = utils.get_last_path(
+            load_dir, '_bestPSNR.pth'
+        )
+        utils.load_checkpoint(model_restored, path_chk_rest)
+        
     L1_loss = CharbonnierLoss()
-    loss_fn_alex = lpips.LPIPS(net='alex')
-    loss_fn_alex = loss_fn_alex.to(device)
+    #l1_lambda = 0.8 
+    #ssim_lambda = 0.2
 
     # Initialize GradScaler for mixed precision
     scaler = GradScaler()
@@ -192,12 +200,12 @@ def main(opt, Train, OPT):
             # Clear gradients
             target = data[0].to(device)
             input_ = data[1].to(device)
-            with autocast(dtype=torch.bfloat16):
+            with autocast( dtype=torch.bfloat16):
                 restored = model_restored(input_)
                 # Compute loss
-                loss = L1_loss(restored, target)
+                loss = L1_loss(restored, target) 
             # Backward pass and optimization
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -217,18 +225,16 @@ def main(opt, Train, OPT):
                 target = data_val[0].cuda()
                 input_ = data_val[1].cuda()
                 with torch.no_grad():
-                    with autocast(dtype=torch.bfloat16):
+                    with autocast( dtype=torch.bfloat16):
                         restored = model_restored(input_)
 
                 restored = restored.to(target.dtype)
                 for res, tar in zip(restored, target):
                     psnr_val_rgb.append(utils.torchPSNR(res, tar))
-                    lpips_val.append(loss_fn_alex.forward(res, target))
                 ssim_val_rgb.append(utils.torchSSIM(restored, target))
                 
             psnr_val_rgb = torch.stack(psnr_val_rgb).mean().item()
             ssim_val_rgb = torch.stack(ssim_val_rgb).mean().item()
-            lpips_val_rgb = torch.stack(lpips_val).mean().item()
 
             # Save the best PSNR model of validation
             if psnr_val_rgb > best_psnr:
@@ -253,17 +259,6 @@ def main(opt, Train, OPT):
             logger.info("[epoch %d SSIM: %.4f --- best_epoch %d Best_SSIM %.4f]" % (
                 epoch, ssim_val_rgb, best_epoch_ssim, best_ssim))
             
-            # Save the best SSIM model of validation
-            if lpips_val_rgb < best_lpips:
-                best_lpips = lpips_val_rgb
-                best_epoch_lpips = epoch
-                torch.save({'epoch': epoch,
-                            'state_dict': model_restored.state_dict(),
-                            'optimizer': optimizer.state_dict()
-                            }, os.path.join(model_dir, "model_best_lpips.pth"))
-            
-            logger.info("[epoch %d LPIPS: %.4f --- best_epoch %d Best_LPIPS %.4f]" % (
-                epoch, lpips_val_rgb, best_epoch_lpips, best_lpips))
             dist.barrier()
 
         scheduler.step()

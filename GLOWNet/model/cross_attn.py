@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-class CrossAttentionLayer(nn.Module):
+class CrossAttn(nn.Module):
     def __init__(self, dim, num_heads=8):
-        super(CrossAttentionLayer, self).__init__()
+        super(CrossAttn, self).__init__()
 
         local_dim, global_dim = dim, dim 
         self.num_heads = num_heads
@@ -81,9 +81,9 @@ class CrossAttentionLayer(nn.Module):
 
         return x_merged
 
-class CrossAttentionWithGating(nn.Module):
+class GatedCrossAttn(nn.Module):
     def __init__(self, dim, num_heads):
-        super(CrossAttentionWithGating, self).__init__()
+        super(GatedCrossAttn, self).__init__()
         self.dim = dim  # Dimensionality of the feature vectors (e.g., 192)
         self.num_heads = num_heads  # Number of attention heads
         self.dim_head = dim // num_heads  # Dimensionality per head
@@ -187,9 +187,9 @@ class CoordinatePositionalEncoding(nn.Module):
 
         return pe  # Shape: (n, num_positions, dim)
 
-class CrossAttentionWithPositionalEncoding(nn.Module):
+class PosEncCrossAttn(nn.Module):
     def __init__(self, dim, num_heads):
-        super(CrossAttentionWithPositionalEncoding, self).__init__()
+        super(PosEncCrossAttn, self).__init__()
         self.dim = dim  # Dimensionality of the feature vectors
         self.num_heads = num_heads  # Number of attention heads
         self.dim_head = dim // num_heads  # Dimensionality per head
@@ -285,9 +285,9 @@ class CrossAttentionWithPositionalEncoding(nn.Module):
 
         return coords  # Shape: (n, height*width, 2)
     
-class GatedCrossAttentionWithPositionalEncoding(nn.Module):
+class GatedPosEncCrossAttn(nn.Module):
     def __init__(self, dim, num_heads):
-        super(GatedCrossAttentionWithPositionalEncoding, self).__init__()
+        super(GatedPosEncCrossAttn, self).__init__()
         self.dim = dim  # Feature dimensionality
         self.num_heads = num_heads  # Number of attention heads
         self.dim_head = dim // num_heads  # Dimensionality per head
@@ -390,9 +390,9 @@ class GatedCrossAttentionWithPositionalEncoding(nn.Module):
 
         return coords  # Shape: (n, height*width, 2)
     
-class RoPEMultiheadAttention(nn.Module):
+class RoPEAttn(nn.Module):
     def __init__(self, dim, num_heads):
-        super(RoPEMultiheadAttention, self).__init__()
+        super(RoPEAttn, self).__init__()
         self.dim = dim  # Feature dimensionality
         self.num_heads = num_heads  # Number of attention heads
         self.dim_head = dim // num_heads  # Dimensionality per head
