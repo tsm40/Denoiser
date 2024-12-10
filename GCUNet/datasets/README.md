@@ -1,18 +1,2 @@
-# Dataset  
-## [DIV2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/)  
-
-## Tree  
-  ```
-  datasets
-    └── Denoising_DIV2K
-         ├── test
-         |     ├── input
-         |     └── target    
-         └── train
-               ├── input
-               └── target    
-
-  ```  
-
-
-
+# Dataset Used for Model Training 
+Same dataset as the one located in `Denoiser/GLOWNet/datasets`
