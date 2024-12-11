@@ -27,13 +27,22 @@ Our experiments on benchmark datasets demonstrate that the proposed modification
 ## 📂 **Repository Structure**
 ```plaintext
 patch-based-global-context-network/
-├── datasets/          # Scripts to download and preprocess datasets
-├── models/            # Model architecture implementations
-├── experiments/       # Training and evaluation scripts
-├── results/           # Results and metrics from experiments
-├── utils/             # Helper functions and utilities
-└── README.md          # Project overview
-```
+├── GCUNet
+    ├── datasets/          # Scripts to download and preprocess datasets
+    ├── models/            # Model architecture implementations
+    ├── experiments/       # Training and evaluation scripts
+    ├── results/           # Results and metrics from experiments
+    ├── utils/             # Helper functions and utilities
+    
+├── GCUNet
+    ├── datasets/          # Scripts to download and preprocess datasets
+    ├── models/            # Model architecture implementations
+    ├── experiments/       # Training and evaluation scripts
+    ├── results/           # Results and metrics from experiments
+    ├── utils/             # Helper functions and utilities
+
+├── README.md          # Project overview
+
 
 --- 
 
