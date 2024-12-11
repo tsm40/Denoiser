@@ -48,10 +48,12 @@ python demo_any_resolution.py --input_dir noisy_images_folder_path --stride shif
 
 
 ## 📊 **Benchmark Results**
-<img width="705" alt="benchmark result" src="https://github.com/user-attachments/assets/f1b781f0-c719-4296-bf32-7e32978576c3">
+![Benchmark Result](https://github.com/user-attachments/assets/0c15d931-8bce-449a-99ab-653ed09e98a9)
+
 
 
 ## 🏞️ **Visual Comparison**
-<img width="931" alt="Visual Comparison 1" src="https://github.com/user-attachments/assets/0fa021d2-d65f-4aee-aae0-46d0bf906fe2">
-<img width="931" alt="Visual Comparion 2" src="https://github.com/user-attachments/assets/9b87298b-2a7e-46c1-99d2-48529373109d">
+![Visual Comparison 1](https://github.com/user-attachments/assets/e3796ea2-149c-4a39-9003-57686be8f2ca)
+![Visual Comparison 2](https://github.com/user-attachments/assets/b96d5ac8-0e98-409e-8519-ee34142bdcae)
+
 
