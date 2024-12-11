@@ -25,6 +25,7 @@ Our experiments on benchmark datasets demonstrate that the proposed modification
 ---
 
 ## 📂 **Repository Structure**
+The Global-Local Optimization Network (GLOWNet) combines the Global Context Network (GCN) with a patch-based architecture to bridge local and global representations. The Global Context UNet (GCUNet), using GCN within a UNet architecture, serves as our baseline.
 ```plaintext
 patch-based-global-context-network/
 ├── GLOWNet
@@ -42,12 +43,20 @@ patch-based-global-context-network/
 ├── README.md              # Project overview
 ```
 
+---
+
+## 🐇 **Quick Run**
+To test our [pre-trained model](https://drive.google.com/file/d/19YrFIHw0todZ5O7c1H0XUOIFkF6V8WU1/view?usp=drive_link) on noisy images, run
+`python demo_any_resolution.py --input_dir noisy_images_folder_path --stride shifted_window_stride --result_dir denoised_images_folder_path --weights path_to_models`
+
+---
+
 ## 📊 **Benchmark Results**
 <img width="705" alt="benchmark result" src="https://github.com/user-attachments/assets/f1b781f0-c719-4296-bf32-7e32978576c3">
 
 --- 
 
-## 📊 **Visual Comparison**
+## 🏞️ **Visual Comparison**
 <img width="931" alt="Visual Comparison 1" src="https://github.com/user-attachments/assets/0fa021d2-d65f-4aee-aae0-46d0bf906fe2">
 <img width="931" alt="Visual Comparion 2" src="https://github.com/user-attachments/assets/9b87298b-2a7e-46c1-99d2-48529373109d">
 
