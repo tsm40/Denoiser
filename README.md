@@ -42,7 +42,9 @@ patch-based-global-context-network/
 
 ## 🐇 **Quick Run**
 To test our [pre-trained model](https://drive.google.com/file/d/19YrFIHw0todZ5O7c1H0XUOIFkF6V8WU1/view?usp=drive_link) on noisy images, run
-```python demo_any_resolution.py --input_dir noisy_images_folder_path --stride shifted_window_stride --result_dir denoised_images_folder_path --weights path_to_models```
+```
+python demo_any_resolution.py --input_dir noisy_images_folder_path --stride shifted_window_stride --result_dir denoised_images_folder_path --weights path_to_models
+```
 
 
 ## 📊 **Benchmark Results**
