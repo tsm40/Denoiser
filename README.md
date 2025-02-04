@@ -1,4 +1,4 @@
-# Patch-based Neural Networks with Global Context Integration
+# Patch-based Neural Networks with Global Context Integration Link: https://drive.google.com/file/d/1rJ56nSF0DnOjyXXWp1lyV971hMtK9gNj/view?usp=drive_link
 Welcome to the GitHub repository for **Patch-based Neural Networks with Global Context Integration**. This repository contains the code and resources for our proposed architecture, which introduces new techniques to enhance patch-based neural networks for improved performance in complex computer vision tasks.
 
 
